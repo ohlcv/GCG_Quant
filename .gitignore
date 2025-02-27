@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+# Data
+*.csv
+*.hdf5
+*.parquet
+# Environments
+.env
+.venv/

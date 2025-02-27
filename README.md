@@ -1,0 +1,1 @@
+# GCG Quantitative Trading System
