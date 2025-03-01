@@ -56,6 +56,7 @@ from src.data_storage.models import TickData, KlineData
 
 class TestSQLiteManager(unittest.TestCase):
     """SQLiteManager 测试类"""
+
     def setUp(self):
         self.temp_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.temp_file.close()
@@ -132,7 +133,9 @@ class TestSQLiteManager(unittest.TestCase):
         self.run_async(self.db_manager.connect())
         save_result = self.run_async(self.db_manager.save_kline_data(self.kline_data))
         self.assertTrue(save_result)
-        query_result = self.run_async(self.db_manager.query_kline_data("BTC/USDT", "1h"))
+        query_result = self.run_async(
+            self.db_manager.query_kline_data("BTC/USDT", "1h")
+        )
         self.assertGreaterEqual(len(query_result), 1)
         self.assertEqual(query_result[0].symbol, "BTC/USDT")
         self.assertEqual(query_result[0].timeframe, "1h")
@@ -145,7 +148,9 @@ class TestSQLiteManager(unittest.TestCase):
         tick_data_list = [
             TickData(
                 symbol="BTC/USDT",
-                timestamp=int((datetime.now() + timedelta(minutes=i)).timestamp() * 1000),
+                timestamp=int(
+                    (datetime.now() + timedelta(minutes=i)).timestamp() * 1000
+                ),
                 datetime=datetime.now() + timedelta(minutes=i),
                 price=50000.0 + i * 10,
                 amount=1.0,
@@ -165,13 +170,42 @@ class TestSQLiteManager(unittest.TestCase):
         """测试时间范围查询"""
         self.run_async(self.db_manager.connect())
         now = datetime.now()
-        tick1 = TickData(symbol="BTC/USDT", timestamp=int((now - timedelta(hours=2)).timestamp() * 1000), datetime=now - timedelta(hours=2), price=50000.0, amount=1.0, side="buy", source="test", trade_id="1")
-        tick2 = TickData(symbol="BTC/USDT", timestamp=int((now - timedelta(hours=1)).timestamp() * 1000), datetime=now - timedelta(hours=1), price=50100.0, amount=0.5, side="sell", source="test", trade_id="2")
-        tick3 = TickData(symbol="BTC/USDT", timestamp=int(now.timestamp() * 1000), datetime=now, price=50200.0, amount=0.2, side="buy", source="test", trade_id="3")
+        tick1 = TickData(
+            symbol="BTC/USDT",
+            timestamp=int((now - timedelta(hours=2)).timestamp() * 1000),
+            datetime=now - timedelta(hours=2),
+            price=50000.0,
+            amount=1.0,
+            side="buy",
+            source="test",
+            trade_id="1",
+        )
+        tick2 = TickData(
+            symbol="BTC/USDT",
+            timestamp=int((now - timedelta(hours=1)).timestamp() * 1000),
+            datetime=now - timedelta(hours=1),
+            price=50100.0,
+            amount=0.5,
+            side="sell",
+            source="test",
+            trade_id="2",
+        )
+        tick3 = TickData(
+            symbol="BTC/USDT",
+            timestamp=int(now.timestamp() * 1000),
+            datetime=now,
+            price=50200.0,
+            amount=0.2,
+            side="buy",
+            source="test",
+            trade_id="3",
+        )
         self.run_async(self.db_manager.save_tick_data([tick1, tick2, tick3]))
         start_time = now - timedelta(hours=1, minutes=30)
         end_time = now - timedelta(minutes=30)
-        query_result = self.run_async(self.db_manager.query_tick_data("BTC/USDT", start_time, end_time))
+        query_result = self.run_async(
+            self.db_manager.query_tick_data("BTC/USDT", start_time, end_time)
+        )
         self.assertEqual(len(query_result), 1)
         self.assertEqual(query_result[0].trade_id, "2")
         self.run_async(self.db_manager.disconnect())
@@ -179,6 +213,7 @@ class TestSQLiteManager(unittest.TestCase):
 
 class TestTimescaleManager(unittest.TestCase):
     """TimescaleManager 测试类"""
+
     def setUp(self):
         self.config = {
             "host": "localhost",
@@ -192,7 +227,9 @@ class TestTimescaleManager(unittest.TestCase):
         self.mock_conn = MagicMock()
         # Set up necessary methods as AsyncMock for await support
         self.mock_conn.execute = AsyncMock()
-        self.mock_conn.fetchval = AsyncMock(return_value=None)  # Default return None for hypertable check
+        self.mock_conn.fetchval = AsyncMock(
+            return_value=None
+        )  # Default return None for hypertable check
         self.mock_conn.executemany = AsyncMock()
         self.mock_conn.fetch = AsyncMock()
         async_context = AsyncMock()
@@ -306,7 +343,15 @@ class TestTimescaleManager(unittest.TestCase):
     def test_query_tick_data(self):
         """测试查询 Tick 数据方法"""
         self.mock_conn.fetch.return_value = [
-            {"symbol": "BTC/USDT", "time": datetime.now(), "price": 50000.0, "amount": 1.0, "side": "buy", "source": "test", "trade_id": "1"}
+            {
+                "symbol": "BTC/USDT",
+                "time": datetime.now(),
+                "price": 50000.0,
+                "amount": 1.0,
+                "side": "buy",
+                "source": "test",
+                "trade_id": "1",
+            }
         ]
         query_result = self.run_async(self.db_manager.query_tick_data("BTC/USDT"))
         self.assertEqual(len(query_result), 1)
@@ -316,9 +361,21 @@ class TestTimescaleManager(unittest.TestCase):
     def test_query_kline_data(self):
         """测试查询 K 线数据方法"""
         self.mock_conn.fetch.return_value = [
-            {"symbol": "BTC/USDT", "time": datetime.now(), "timeframe": "1h", "open": 50000.0, "high": 50100.0, "low": 49900.0, "close": 50050.0, "volume": 100.0, "source": "test"}
+            {
+                "symbol": "BTC/USDT",
+                "time": datetime.now(),
+                "timeframe": "1h",
+                "open": 50000.0,
+                "high": 50100.0,
+                "low": 49900.0,
+                "close": 50050.0,
+                "volume": 100.0,
+                "source": "test",
+            }
         ]
-        query_result = self.run_async(self.db_manager.query_kline_data("BTC/USDT", "1h"))
+        query_result = self.run_async(
+            self.db_manager.query_kline_data("BTC/USDT", "1h")
+        )
         self.assertEqual(len(query_result), 1)
         self.assertEqual(query_result[0].symbol, "BTC/USDT")
         self.mock_conn.fetch.assert_called()
@@ -326,49 +383,50 @@ class TestTimescaleManager(unittest.TestCase):
 
 class TestRedisManager(unittest.TestCase):
     """RedisManager 测试类"""
+
     def setUp(self):
         self.config = {"host": "localhost", "port": 6379, "db": 0, "password": ""}
         self.redis_manager = RedisManager(self.config, use_redis=True)
-        
+
         # 创建一个真正的MagicMock对象作为Redis实例
         self.mock_redis = MagicMock()
-        
+
         # 为Redis的close方法创建一个AsyncMock
         self.mock_redis.close = AsyncMock()
-        
+
         # 为Redis的get方法创建一个AsyncMock
         self.mock_redis.get = AsyncMock()
-        
+
         # 创建一个MagicMock作为Pipeline
         self.mock_pipeline = MagicMock()
-        
+
         # Pipeline的方法返回self以支持链式调用
         self.mock_pipeline.hset.return_value = self.mock_pipeline
         self.mock_pipeline.expire.return_value = self.mock_pipeline
         self.mock_pipeline.publish.return_value = self.mock_pipeline
         self.mock_pipeline.set.return_value = self.mock_pipeline
-        
+
         # 设置execute为AsyncMock，以便能够await它
         self.mock_pipeline.execute = AsyncMock()
-        
+
         # 确保Redis的pipeline方法返回我们配置的mock_pipeline
         self.mock_redis.pipeline.return_value = self.mock_pipeline
-        
+
         # 创建一个MagicMock作为PubSub
         self.mock_pubsub = MagicMock()
-        
+
         # 设置PubSub的异步方法
         self.mock_pubsub.psubscribe = AsyncMock()
         self.mock_pubsub.unsubscribe = AsyncMock()
         self.mock_pubsub.run = AsyncMock()
-        
+
         # 确保Redis的pubsub方法返回我们配置的mock_pubsub
         self.mock_redis.pubsub.return_value = self.mock_pubsub
-        
+
         # 设置redis_manager实例的redis和pubsub属性
         self.redis_manager.redis = self.mock_redis
         self.redis_manager.pubsub = self.mock_pubsub
-        
+
         self.create_test_data()
 
     def tearDown(self):
@@ -412,29 +470,31 @@ class TestRedisManager(unittest.TestCase):
 
     def test_connect_and_disconnect(self):
         """测试连接和断开连接方法"""
-        with patch("redis.asyncio.Redis.from_url", new_callable=AsyncMock) as mock_from_url:
+        with patch(
+            "redis.asyncio.Redis.from_url", new_callable=AsyncMock
+        ) as mock_from_url:
             mock_redis = MagicMock()
             mock_redis.close = AsyncMock()
             mock_pubsub = MagicMock()
             mock_redis.pubsub.return_value = mock_pubsub
             mock_from_url.return_value = mock_redis
-            
+
             # 此处保存旧的redis和pubsub，以便恢复
             old_redis = self.redis_manager.redis
             old_pubsub = self.redis_manager.pubsub
-            
+
             # 设置为None以便测试connect
             self.redis_manager.redis = None
             self.redis_manager.pubsub = None
-            
+
             connect_result = self.run_async(self.redis_manager.connect())
             self.assertTrue(connect_result)
-            
+
             # 断开连接
             disconnect_result = self.run_async(self.redis_manager.disconnect())
             self.assertTrue(disconnect_result)
             self.assertIsNone(self.redis_manager.redis)
-            
+
             # 恢复为原来的mock以继续其他测试
             self.redis_manager.redis = old_redis
             self.redis_manager.pubsub = old_pubsub
@@ -464,7 +524,9 @@ class TestRedisManager(unittest.TestCase):
     def test_save_kline_data(self):
         """测试保存 K 线数据方法"""
         # 使用我们在setUp中创建的mock_pipeline
-        save_result = self.run_async(self.redis_manager.save_kline_data(self.kline_data))
+        save_result = self.run_async(
+            self.redis_manager.save_kline_data(self.kline_data)
+        )
         self.assertTrue(save_result)
         # 验证调用了预期的方法
         self.mock_pipeline.set.assert_called()
@@ -489,18 +551,21 @@ class TestRedisManager(unittest.TestCase):
 
     def test_subscribe_tick(self):
         """测试订阅 Tick 数据方法"""
+
         async def mock_callback(data):
             pass
 
         # 模拟_listen方法
-        with patch.object(self.redis_manager, "_listen", new_callable=AsyncMock) as mock_listen:
+        with patch.object(
+            self.redis_manager, "_listen", new_callable=AsyncMock
+        ) as mock_listen:
             # 模拟asyncio.create_task
             with patch("asyncio.create_task") as mock_create_task:
                 # 执行测试
                 subscribe_result = self.run_async(
                     self.redis_manager.subscribe_tick(["BTC/USDT"], mock_callback)
                 )
-                
+
                 # 验证结果
                 self.assertTrue(subscribe_result)
                 # 验证pubsub.psubscribe被调用(不关心具体参数)
@@ -512,18 +577,23 @@ class TestRedisManager(unittest.TestCase):
 
     def test_subscribe_kline(self):
         """测试订阅 K 线数据方法"""
+
         async def mock_callback(data):
             pass
 
         # 模拟_listen方法
-        with patch.object(self.redis_manager, "_listen", new_callable=AsyncMock) as mock_listen:
+        with patch.object(
+            self.redis_manager, "_listen", new_callable=AsyncMock
+        ) as mock_listen:
             # 模拟asyncio.create_task
             with patch("asyncio.create_task") as mock_create_task:
                 # 执行测试
                 subscribe_result = self.run_async(
-                    self.redis_manager.subscribe_kline(["BTC/USDT"], "1h", mock_callback)
+                    self.redis_manager.subscribe_kline(
+                        ["BTC/USDT"], "1h", mock_callback
+                    )
                 )
-                
+
                 # 验证结果
                 self.assertTrue(subscribe_result)
                 # 验证pubsub.psubscribe被调用(不关心具体参数)

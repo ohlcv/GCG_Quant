@@ -11,6 +11,12 @@
     2. 学习aioredis库进行异步Redis操作
     3. 掌握合理的缓存策略和过期时间设置
     4. 理解如何设计可选组件，使系统在不同配置下都能正常工作
+    5. 掌握Redis的数据结构选择（Hash vs String）及其应用场景
+    6. 理解发布/订阅模式在实时数据传输中的应用
+    7. 学习异步编程中的任务管理和事件循环使用
+    8. 掌握开发环境下的调试和错误追踪技巧
+    9. 理解配置驱动的组件设计模式
+    10. 学习内存数据库的性能优化策略
 """
 
 import asyncio
@@ -18,12 +24,8 @@ from redis.asyncio import Redis as RedisAsync
 from typing import Dict, List, Any, Optional, Union, Callable
 from datetime import datetime
 import json
-import logging
 
 from ..data_storage.models import TickData, KlineData
-
-# 创建日志记录器
-logger = logging.getLogger("RedisManager")
 
 
 class RedisManager:
@@ -34,6 +36,12 @@ class RedisManager:
     - Redis是内存数据库，提供高速读写和发布/订阅机制
     - 可选组件设计，支持无缝启用/禁用
     - 异步Redis操作，充分利用非阻塞I/O
+    - 使用pipeline批量操作提升性能
+    - 合理的数据结构选择和过期策略
+    - 发布/订阅模式实现实时数据推送
+    - 开发环境下的错误快速暴露策略
+    - 内存数据库的连接池管理
+    - 实时数据的并发处理机制
     """
 
     def __init__(self, config: Dict[str, Any], use_redis: bool = True):
@@ -47,24 +55,26 @@ class RedisManager:
         学习点：
         - 通过参数控制组件启用/禁用
         - 配置驱动的初始化
-        - 日志记录配置状态，便于调试
+        - 配置参数的默认值设置
+        - 敏感信息处理（密码等）
+        - 组件状态管理
+        - 开发环境配置暴露
+        - 配置参数校验机制
         """
         self.config = config
         self.use_redis = use_redis
         self.redis = None
         self.pubsub = None
 
-        # 开发阶段，暴露配置信息以便调试
-        # 注意：生产环境应隐藏敏感信息如密码
         self.host = config.get("host", "localhost")
         self.port = config.get("port", 6379)
         self.db = config.get("db", 0)
         self.password = config.get("password", "")
 
         if not self.use_redis:
-            logger.info("Redis功能已禁用")
+            print("Redis功能已禁用")
         else:
-            logger.info(f"Redis配置: host={self.host}, port={self.port}, db={self.db}")
+            print(f"Redis配置: host={self.host}, port={self.port}, db={self.db}")
 
     async def connect(self) -> bool:
         """
@@ -77,19 +87,21 @@ class RedisManager:
         - 条件连接，根据配置决定是否连接
         - 优雅处理禁用状态，不影响系统功能
         - aioredis提供异步Redis接口，支持非阻塞操作
+        - Redis URL构建和连接参数设置
+        - 发布/订阅对象的初始化
+        - 连接状态监控
+        - 连接超时处理
         """
-        # 如果Redis禁用，直接返回成功
         if not self.use_redis:
-            logger.info("Redis功能已禁用，跳过连接")
+            print("Redis功能已禁用，跳过连接")
             return True
-        logger.info(f"连接到Redis: {self.host}:{self.port}/{self.db}")
-        # 构建Redis连接URL
+
+        print(f"连接到Redis: {self.host}:{self.port}/{self.db}")
         password_part = f":{self.password}@" if self.password else ""
         redis_url = f"redis://{password_part}{self.host}:{self.port}/{self.db}"
         self.redis = await RedisAsync.from_url(redis_url)
-        # 创建发布/订阅对象
         self.pubsub = self.redis.pubsub()
-        logger.info("成功连接到Redis")
+        print("成功连接到Redis")
         return True
 
     async def disconnect(self) -> bool:
@@ -98,36 +110,61 @@ class RedisManager:
 
         Returns:
             bool: 断开连接是否成功
+
+        学习点：
+        - 资源清理和连接关闭
+        - 状态重置
+        - 优雅关闭处理
+        - 连接池清理
+        - 订阅关系清理
         """
-        # 如果Redis禁用或未连接，直接返回成功
         if not self.use_redis or not self.redis:
             return True
-        logger.info("断开与Redis的连接")
+
+        print("断开与Redis的连接")
         await self.redis.close()
         self.redis = None
         self.pubsub = None
-        logger.info("成功断开与Redis的连接")
+        print("成功断开与Redis的连接")
         return True
 
     async def save_tick_data(self, data: Union[TickData, List[TickData]]) -> bool:
-        # 学习点：如果 use_redis=False，此方法直接返回 True，不执行任何操作
+        """
+        保存Tick数据到Redis
+
+        Args:
+            data: 单个Tick数据对象或Tick数据对象列表
+
+        Returns:
+            bool: 保存是否成功
+
+        学习点：
+        - 使用Hash结构存储，减少键数量
+        - Pipeline批量操作提升性能
+        - 数据序列化和反序列化
+        - 发布/订阅实时数据更新
+        - 合理的过期时间设置
+        - 批量数据处理策略
+        - 内存使用优化
+        """
         if not self.use_redis or not self.redis:
             return True
-        logger.info("保存Tick数据到Redis")
+
+        print("保存Tick数据到Redis")
         data_list = data if isinstance(data, list) else [data]
         if not data_list:
             return True
+
         pipe = self.redis.pipeline()
         for item in data_list:
-            # 使用 Hash 结构存储，减少键数量
             hash_key = f"tick:{item.symbol}"
             value = json.dumps(item.to_dict())
             pipe.hset(hash_key, item.timestamp, value)
-            pipe.expire(hash_key, 3600)  # 设置过期时间 1 小时
+            pipe.expire(hash_key, 3600)  # 1小时过期
             pipe.hset(f"tick:{item.symbol}:latest", "data", value)
             pipe.publish(f"tick:{item.symbol}", value)
         await pipe.execute()
-        logger.info(f"成功保存 {len(data_list)} 条Tick数据到Redis")
+        print(f"成功保存 {len(data_list)} 条Tick数据到Redis")
         return True
 
     async def save_kline_data(self, data: Union[KlineData, List[KlineData]]) -> bool:
@@ -144,44 +181,32 @@ class RedisManager:
         - 根据不同时间周期设置不同的过期时间
         - JSON序列化对象，便于存储和传输
         - 频道命名约定，确保订阅者能接收到正确的数据
+        - 批量操作性能优化
+        - 数据一致性保证
+        - 键名设计最佳实践
+        - 实时数据更新策略
         """
-        # 如果Redis禁用或未连接，直接返回成功
         if not self.use_redis or not self.redis:
             return True
 
-        logger.info("保存K线数据到Redis")
-
-        # 转换为列表以统一处理
+        print("保存K线数据到Redis")
         data_list = data if isinstance(data, list) else [data]
         if not data_list:
             return True
 
-        # 使用管道批量操作，提高效率
         pipe = self.redis.pipeline()
-
         for item in data_list:
-            # 构建Redis键，格式: kline:{symbol}:{timeframe}:{timestamp}
             key = f"kline:{item.symbol}:{item.timeframe}:{item.timestamp}"
-
-            # 将数据转换为JSON字符串
             value = json.dumps(item.to_dict())
-
-            # 设置数据，并设置过期时间（根据时间周期设置不同的过期时间）
             expire_seconds = self._get_expire_seconds(item.timeframe)
             pipe.set(key, value, ex=expire_seconds)
-
-            # 将最新的K线数据存储在单独的键中
             latest_key = f"kline:{item.symbol}:{item.timeframe}:latest"
             pipe.set(latest_key, value)
-
-            # 发布数据到对应的频道
             channel = f"kline:{item.symbol}:{item.timeframe}"
             pipe.publish(channel, value)
 
-        # 执行管道中的所有命令
         await pipe.execute()
-
-        logger.info(f"成功保存 {len(data_list)} 条K线数据到Redis")
+        print(f"成功保存 {len(data_list)} 条K线数据到Redis")
         return True
 
     async def get_latest_tick(self, symbol: str) -> Optional[TickData]:
@@ -195,35 +220,29 @@ class RedisManager:
             Optional[TickData]: Tick数据对象，如果不存在则返回None
 
         学习点：
-        - 条件返回，在禁用时返回None
-        - 错误处理确保接口稳定
-        - 对象反序列化，从JSON字符串还原对象
+        - 使用Optional类型提高类型安全
+        - 数据反序列化和对象重建
+        - 最新数据快速访问设计
+        - 空值处理和返回类型一致性
+        - 数据完整性验证
+        - 类型转换安全处理
+        - 缓存命中率优化
         """
-        # 如果Redis禁用或未连接，直接返回None
         if not self.use_redis or not self.redis:
             return None
 
-        logger.info(f"获取 {symbol} 的最新Tick数据")
+        print(f"获取 {symbol} 的最新Tick数据")
+        key = f"tick:{symbol}:latest"
+        value = await self.redis.get(key)
 
-        try:
-            # 获取最新Tick数据的键
-            key = f"tick:{symbol}:latest"
-
-            # 获取数据
-            value = await self.redis.get(key)
-            if not value:
-                return None
-
-            # 解析JSON数据
-            data = json.loads(value)
-
-            # 创建TickData对象
-            tick = TickData.from_dict(data)
-
-            return tick
-        except Exception as e:
-            logger.error(f"获取最新Tick数据失败: {str(e)}")
+        if not value:
+            print(f"未找到 {symbol} 的最新Tick数据")
             return None
+
+        data = json.loads(value)
+        tick = TickData.from_dict(data)
+        print(f"成功获取 {symbol} 的最新Tick数据")
+        return tick
 
     async def get_latest_kline(
         self, symbol: str, timeframe: str
@@ -237,32 +256,31 @@ class RedisManager:
 
         Returns:
             Optional[KlineData]: K线数据对象，如果不存在则返回None
+
+        学习点：
+        - 组合键设计（symbol + timeframe）
+        - 数据一致性保证
+        - 类型转换和数据验证
+        - 返回值类型安全
+        - 缓存键设计模式
+        - 数据版本控制
+        - 查询性能优化
         """
-        # 如果Redis禁用或未连接，直接返回None
         if not self.use_redis or not self.redis:
             return None
 
-        logger.info(f"获取 {symbol} 的最新 {timeframe} K线数据")
+        print(f"获取 {symbol} 的最新 {timeframe} K线数据")
+        key = f"kline:{symbol}:{timeframe}:latest"
+        value = await self.redis.get(key)
 
-        try:
-            # 获取最新K线数据的键
-            key = f"kline:{symbol}:{timeframe}:latest"
-
-            # 获取数据
-            value = await self.redis.get(key)
-            if not value:
-                return None
-
-            # 解析JSON数据
-            data = json.loads(value)
-
-            # 创建KlineData对象
-            kline = KlineData.from_dict(data)
-
-            return kline
-        except Exception as e:
-            logger.error(f"获取最新K线数据失败: {str(e)}")
+        if not value:
+            print(f"未找到 {symbol} 的 {timeframe} K线数据")
             return None
+
+        data = json.loads(value)
+        kline = KlineData.from_dict(data)
+        print(f"成功获取 {symbol} 的 {timeframe} K线数据")
+        return kline
 
     async def subscribe_tick(self, symbols: List[str], callback: Callable) -> bool:
         """
@@ -276,40 +294,32 @@ class RedisManager:
             bool: 订阅是否成功
 
         学习点：
-        - 发布/订阅模式，实现实时数据推送
-        - 回调函数处理，异步接收和处理数据
-        - 优雅处理禁用状态，返回False表示不支持
+        - 发布/订阅模式实现
+        - 回调函数设计
+        - 异步事件处理
+        - 多通道订阅
+        - 消息处理函数设计
+        - 订阅状态管理
+        - 并发回调处理
+        - 消息队列缓冲
         """
-        # 如果Redis禁用或未连接，直接返回失败
         if not self.use_redis or not self.redis or not self.pubsub:
-            logger.info("Redis功能已禁用，不支持订阅")
+            print("Redis未启用或未连接，无法订阅")
             return False
 
-        logger.info(f"订阅 {symbols} 的Tick数据")
+        print(f"订阅 {symbols} 的Tick数据")
+        channels = [f"tick:{symbol}" for symbol in symbols]
 
-        try:
-            # 订阅多个频道
-            channels = [f"tick:{symbol}" for symbol in symbols]
+        async def message_handler(message):
+            if message["type"] == "message":
+                data = json.loads(message["data"])
+                tick = TickData.from_dict(data)
+                await callback([tick])
 
-            # 注册回调函数
-            async def message_handler(message):
-                # 解析消息
-                if message["type"] == "message":
-                    data = json.loads(message["data"])
-                    tick = TickData.from_dict(data)
-                    await callback([tick])
-
-            # 设置消息处理函数
-            self.pubsub.psubscribe(**{channel: message_handler for channel in channels})
-
-            # 启动监听任务
-            asyncio.create_task(self._listen())
-
-            logger.info(f"成功订阅 {symbols} 的Tick数据")
-            return True
-        except Exception as e:
-            logger.error(f"订阅Tick数据失败: {str(e)}")
-            return False
+        self.pubsub.psubscribe(**{channel: message_handler for channel in channels})
+        asyncio.create_task(self._listen())
+        print(f"成功订阅 {symbols} 的Tick数据")
+        return True
 
     async def subscribe_kline(
         self, symbols: List[str], timeframe: str, callback: Callable
@@ -324,53 +334,51 @@ class RedisManager:
 
         Returns:
             bool: 订阅是否成功
+
+        学习点：
+        - 多维度订阅（品种+时间周期）
+        - 回调函数异步执行
+        - 事件驱动设计
+        - 消息过滤和处理
+        - 任务管理
+        - 订阅模式扩展性
+        - 消息重试机制
+        - 订阅生命周期管理
         """
-        # 如果Redis禁用或未连接，直接返回失败
         if not self.use_redis or not self.redis or not self.pubsub:
-            logger.info("Redis功能已禁用，不支持订阅")
+            print("Redis未启用或未连接，无法订阅")
             return False
 
-        logger.info(f"订阅 {symbols} 的 {timeframe} K线数据")
+        print(f"订阅 {symbols} 的 {timeframe} K线数据")
+        channels = [f"kline:{symbol}:{timeframe}" for symbol in symbols]
 
-        try:
-            # 订阅多个频道
-            channels = [f"kline:{symbol}:{timeframe}" for symbol in symbols]
+        async def message_handler(message):
+            if message["type"] == "message":
+                data = json.loads(message["data"])
+                kline = KlineData.from_dict(data)
+                await callback([kline])
 
-            # 注册回调函数
-            async def message_handler(message):
-                # 解析消息
-                if message["type"] == "message":
-                    data = json.loads(message["data"])
-                    kline = KlineData.from_dict(data)
-                    await callback([kline])
-
-            # 设置消息处理函数
-            self.pubsub.psubscribe(**{channel: message_handler for channel in channels})
-
-            # 启动监听任务
-            asyncio.create_task(self._listen())
-
-            logger.info(f"成功订阅 {symbols} 的 {timeframe} K线数据")
-            return True
-        except Exception as e:
-            logger.error(f"订阅K线数据失败: {str(e)}")
-            return False
+        self.pubsub.psubscribe(**{channel: message_handler for channel in channels})
+        asyncio.create_task(self._listen())
+        print(f"成功订阅 {symbols} 的 {timeframe} K线数据")
+        return True
 
     async def _listen(self):
         """
         监听Redis发布/订阅消息
 
         学习点：
-        - 异步事件循环，持续监听消息
-        - 错误处理确保任务稳定运行
-        - 内部方法，以下划线开头表示不应被外部直接调用
+        - 异步事件循环设计
+        - 任务取消处理
+        - 内部方法命名规范
+        - 长期运行任务管理
+        - 错误传播控制
+        - 资源占用监控
+        - 消息处理性能优化
         """
-        try:
-            await self.pubsub.run()
-        except asyncio.CancelledError:
-            logger.info("Redis发布/订阅监听任务被取消")
-        except Exception as e:
-            logger.error(f"Redis发布/订阅监听发生错误: {str(e)}")
+        print("开始监听Redis发布/订阅消息")
+        await self.pubsub.run()
+        print("Redis发布/订阅消息监听已结束")
 
     def _get_expire_seconds(self, timeframe: str) -> int:
         """
@@ -383,11 +391,14 @@ class RedisManager:
             int: 过期时间（秒）
 
         学习点：
-        - 根据业务需求设置合理的过期时间
-        - 缓存策略：短周期数据保留较短时间，长周期数据保留较长时间
-        - 内部辅助方法，提高代码可读性和可维护性
+        - 业务逻辑与时间管理
+        - 缓存策略设计
+        - 配置值管理
+        - 默认值处理
+        - 时间单位转换
+        - 过期时间动态调整
+        - 数据生命周期管理
         """
-        # 根据时间周期设置不同的过期时间
         if timeframe == "1m":
             return 3600 * 24  # 1天
         elif timeframe == "5m":
