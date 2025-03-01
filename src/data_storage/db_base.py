@@ -19,7 +19,7 @@ import importlib
 import logging
 
 # 导入数据模型
-from ..data_collector.models import TickData, KlineData
+from ..data_storage.models import TickData, KlineData
 
 # 创建日志记录器
 logger = logging.getLogger("DBManager")
@@ -188,10 +188,14 @@ def create_db_manager(config: Dict[str, Any]) -> DBManager:
         raise ValueError("TimescaleDB 配置缺少 host 参数")
     try:
         if db_type == "sqlite":
-            module = importlib.import_module("..data_storage.sqlite_manager", __package__)
+            module = importlib.import_module(
+                "..data_storage.sqlite_manager", __package__
+            )
             return getattr(module, "SQLiteManager")(config["sqlite"])
         elif db_type == "timescaledb":
-            module = importlib.import_module("..data_storage.timescale_manager", __package__)
+            module = importlib.import_module(
+                "..data_storage.timescale_manager", __package__
+            )
             return getattr(module, "TimescaleManager")(config["timescale"])
     except (ImportError, AttributeError) as e:
         logger.error(f"导入数据库管理器失败: {str(e)}")

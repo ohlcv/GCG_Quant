@@ -22,7 +22,7 @@ import json
 import logging
 
 from .db_base import DBManager
-from ..data_collector.models import TickData, KlineData
+from ..data_storage.models import TickData, KlineData
 
 # 创建日志记录器
 logger = logging.getLogger("SQLiteManager")

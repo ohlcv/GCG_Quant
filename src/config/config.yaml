@@ -1,0 +1,24 @@
+data_collector:
+  exchange:
+    exchange_id: binance  # 替换为您的交易所
+    api_key: your_api_key  # 填入您的 API 密钥
+    secret: your_secret    # 填入您的 API 密钥
+    timeout: 30000
+    use_websocket: false
+  file_import:
+    data_dir: ./data/raw   # 历史数据目录（可选）
+  symbols: ["BTC/USDT", "ETH/USDT"]  # 监控的交易品种
+  timeframes: ["1m", "5m"]           # K 线周期
+data_storage:
+  db_type: sqlite  # 可选 'timescaledb'
+  sqlite:
+    db_file: ./data/gcg_quant.db
+  use_redis: false  # 是否启用 Redis
+  redis:
+    host: localhost
+    port: 6379
+    db: 0
+    password: ""
+  batch_size: 1000
+logging:
+  level: INFO

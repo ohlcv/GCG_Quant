@@ -486,7 +486,7 @@ class TimescaleManager:
 
 ```python
 import asyncio
-import aioredis
+from redis.asyncio import Redis as RedisAsync
 from typing import Dict, List, Any, Optional, Union
 from datetime import datetime
 import json

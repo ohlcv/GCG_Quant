@@ -14,13 +14,13 @@
 """
 
 import asyncio
-import aioredis
+from redis.asyncio import Redis as RedisAsync
 from typing import Dict, List, Any, Optional, Union, Callable
 from datetime import datetime
 import json
 import logging
 
-from ..data_collector.models import TickData, KlineData
+from ..data_storage.models import TickData, KlineData
 
 # 创建日志记录器
 logger = logging.getLogger("RedisManager")
@@ -82,19 +82,13 @@ class RedisManager:
         if not self.use_redis:
             logger.info("Redis功能已禁用，跳过连接")
             return True
-
         logger.info(f"连接到Redis: {self.host}:{self.port}/{self.db}")
-
         # 构建Redis连接URL
         password_part = f":{self.password}@" if self.password else ""
         redis_url = f"redis://{password_part}{self.host}:{self.port}/{self.db}"
-
-        # 开发阶段简化错误处理，直接暴露异常
-        self.redis = await aioredis.from_url(redis_url)
-
+        self.redis = await RedisAsync.from_url(redis_url)
         # 创建发布/订阅对象
         self.pubsub = self.redis.pubsub()
-
         logger.info("成功连接到Redis")
         return True
 
@@ -108,13 +102,10 @@ class RedisManager:
         # 如果Redis禁用或未连接，直接返回成功
         if not self.use_redis or not self.redis:
             return True
-
         logger.info("断开与Redis的连接")
-
         await self.redis.close()
         self.redis = None
         self.pubsub = None
-
         logger.info("成功断开与Redis的连接")
         return True
 
