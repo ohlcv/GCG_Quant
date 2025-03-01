@@ -21,6 +21,10 @@ import tempfile
 from unittest import mock
 from datetime import datetime, timedelta
 import logging
+import warnings
+# 可选：屏蔽协程未等待的警告
+# 取消下面这行的注释可以屏蔽警告
+warnings.filterwarnings("ignore", message="coroutine.*was never awaited")
 
 # 禁用测试过程中的日志输出
 logging.disable(logging.CRITICAL)
