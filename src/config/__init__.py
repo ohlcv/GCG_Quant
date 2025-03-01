@@ -1,0 +1,31 @@
+# 配置模块初始化文件
+from .settings import *
+from .constants import *
+
+__all__ = [
+    'DATABASE_CONFIG',
+    'COLLECTOR_CONFIG',
+    'LOG_CONFIG',
+    'DATATYPE_TICK',
+    'DATATYPE_KLINE',
+    'DATATYPE_ORDERBOOK',
+    'DATATYPE_TRADE',
+    'TIMEFRAME_1M',
+    'TIMEFRAME_5M',
+    'TIMEFRAME_15M',
+    'TIMEFRAME_30M',
+    'TIMEFRAME_1H',
+    'TIMEFRAME_4H',
+    'TIMEFRAME_1D',
+    'TABLE_TICK',
+    'TABLE_KLINE',
+    'TABLE_ORDERBOOK',
+    'TABLE_TRADE',
+    'EXCHANGE_BINANCE',
+    'EXCHANGE_OKEX',
+    'EXCHANGE_HUOBI',
+    'STATUS_SUCCESS',
+    'STATUS_FAILED',
+    'STATUS_RUNNING',
+    'STATUS_STOPPED'
+]

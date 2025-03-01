@@ -438,40 +438,30 @@ class FileImporter(BaseCollector):
         - 异步文件读取
         - 错误处理和恢复
         """
-        try:
-            # 获取文件基本信息
-            stat = os.stat(file_path)
-
-            ext = os.path.splitext(file_path)[1].lower()
-
-            # 默认元数据
-            metadata = {
-                "size": stat.st_size,
-                "created": datetime.fromtimestamp(stat.st_ctime),
-                "modified": datetime.fromtimestamp(stat.st_mtime),
-                "start_time": None,
-                "end_time": None,
-                "count": 0,
-            }
-
-            # 根据文件类型读取前几行和后几行，获取时间范围
+        stat = os.stat(file_path)
+        ext = os.path.splitext(file_path)[1].lower()
+        metadata = {
+            "size": stat.st_size,
+            "created": datetime.fromtimestamp(stat.st_ctime),
+            "modified": datetime.fromtimestamp(stat.st_mtime),
+            "start_time": None,
+            "end_time": None,
+            "count": 0,
+        }
+        async with aiofiles.open(file_path, "r") as f:
+            content = await f.read()
             if ext == FILE_EXT_CSV:
-                # 暂时使用文件创建时间和修改时间作为时间范围
-                # 实际应用中可以读取文件前几行和后几行，提取时间
-                metadata["start_time"] = metadata["created"]
-                metadata["end_time"] = metadata["modified"]
-            elif ext == FILE_EXT_JSON:
-                # 同上
-                metadata["start_time"] = metadata["created"]
-                metadata["end_time"] = metadata["modified"]
-            else:
-                logger.warning(f"不支持的文件格式: {ext}")
-                return None
-
+                reader = csv.DictReader(content.splitlines())
+                rows = list(reader)
+                if rows:
+                    metadata["start_time"] = parse_time(
+                        rows[0].get("time", rows[0].get("datetime"))
+                    )
+                    metadata["end_time"] = parse_time(
+                        rows[-1].get("time", rows[-1].get("datetime"))
+                    )
+                    metadata["count"] = len(rows)
             return metadata
-        except Exception as e:
-            logger.error(f"获取文件元数据失败: {file_path}, 错误: {str(e)}")
-            return None
 
     def _extract_symbol_from_filename(self, filename: str) -> Optional[str]:
         """
